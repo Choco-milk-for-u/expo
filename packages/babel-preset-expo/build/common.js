@@ -15,6 +15,8 @@ exports.getIsNodeModule = getIsNodeModule;
 exports.getBaseUrl = getBaseUrl;
 exports.getReactCompiler = getReactCompiler;
 exports.getIsServer = getIsServer;
+exports.getIsLoaderBundle = getIsLoaderBundle;
+exports.getIsHermesV1 = getIsHermesV1;
 exports.getMetroSourceType = getMetroSourceType;
 exports.getBabelRuntimeVersion = getBabelRuntimeVersion;
 exports.getExpoRouterAbsoluteAppRoot = getExpoRouterAbsoluteAppRoot;
@@ -92,7 +94,9 @@ function getIsFastRefreshEnabled(caller) {
     assertExpoBabelCaller(caller);
     if (!caller)
         return false;
-    return caller.isHMREnabled && !caller.isServer && !caller.isNodeModule && getIsDev(caller);
+    // NOTE(@kitten): `isHMREnabled` is always true in `@expo/metro-config`.
+    // However, we still use this option to ensure fast refresh is only enabled in supported runtimes (Metro + Expo)
+    return !!caller.isHMREnabled && !caller.isServer && !caller.isNodeModule && getIsDev(caller);
 }
 function getIsProd(caller) {
     assertExpoBabelCaller(caller);
@@ -115,6 +119,14 @@ function getReactCompiler(caller) {
 function getIsServer(caller) {
     assertExpoBabelCaller(caller);
     return caller?.isServer ?? false;
+}
+function getIsLoaderBundle(caller) {
+    assertExpoBabelCaller(caller);
+    return caller?.isLoaderBundle ?? false;
+}
+function getIsHermesV1(caller) {
+    assertExpoBabelCaller(caller);
+    return caller?.isHermesV1 ?? false;
 }
 function getMetroSourceType(caller) {
     assertExpoBabelCaller(caller);

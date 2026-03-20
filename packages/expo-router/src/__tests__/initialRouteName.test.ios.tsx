@@ -113,11 +113,9 @@ it('push should include (group)/index as an anchor route when using withAnchor',
               path: '/',
             },
           ],
-          stale: true,
         },
       },
     ],
-    stale: true,
   });
 
   act(() => router.push('/orange', { withAnchor: true }));
@@ -147,6 +145,7 @@ it('push should include (group)/index as an anchor route when using withAnchor',
             {
               key: expect.any(String),
               name: '(group)',
+              params: { initial: false, params: { initial: false }, screen: 'orange' },
               path: undefined,
               state: {
                 index: 1,
@@ -162,7 +161,7 @@ it('push should include (group)/index as an anchor route when using withAnchor',
                   {
                     key: expect.any(String),
                     name: 'orange',
-                    params: {},
+                    params: { initial: false },
                     path: undefined,
                   },
                 ],
@@ -203,11 +202,9 @@ it('push should ignore (group)/index as an initial route if no anchor is specifi
               path: '/',
             },
           ],
-          stale: true,
         },
       },
     ],
-    stale: true,
   });
 
   act(() => router.push('/orange'));
@@ -237,11 +234,24 @@ it('push should ignore (group)/index as an initial route if no anchor is specifi
             {
               key: expect.any(String),
               name: '(group)',
-              params: {
-                params: {},
-                screen: 'orange',
-              },
+              params: { params: {}, screen: 'orange' },
               path: undefined,
+              state: {
+                index: 0,
+                key: expect.any(String),
+                preloadedRoutes: [],
+                routeNames: ['test', 'orange'],
+                routes: [
+                  {
+                    key: expect.any(String),
+                    name: 'orange',
+                    params: {},
+                    path: undefined,
+                  },
+                ],
+                stale: false,
+                type: 'stack',
+              },
             },
           ],
           stale: false,

@@ -1,5 +1,7 @@
 import AVFoundation
+#if canImport(ZXingObjC)
 import ZXingObjC
+#endif
 import VisionKit
 import Vision
 
@@ -76,8 +78,6 @@ class BarcodeScannerUtils {
       if !value.isEmpty && value.hasPrefix("0") {
         result["data"] = value.dropFirst()
       }
-    } else {
-      result["data"] = item.payloadStringValue
     }
 
     let bounds = item.bounds
@@ -103,6 +103,7 @@ class BarcodeScannerUtils {
     ]
   }
 
+  #if canImport(ZXingObjC)
   static func zxResultToDictionary(_ barcodeScannerResult: ZXResult) -> [String: Any] {
     var result = [String: Any]()
     result["type"] = BarcodeScannerUtils.zxingFormatToString(barcodeScannerResult.barcodeFormat)
@@ -134,4 +135,5 @@ class BarcodeScannerUtils {
       return "unknown"
     }
   }
+  #endif
 }

@@ -5,12 +5,20 @@ struct AudioMode: Record {
   @Field var interruptionMode: InterruptionMode = .mixWithOthers
   @Field var allowsRecording: Bool = false
   @Field var shouldPlayInBackground: Bool = false
+  @Field var shouldRouteThroughEarpiece: Bool = false
+  @Field var allowsBackgroundRecording: Bool = false
 }
 
 enum InterruptionMode: String, Enumerable {
   case mixWithOthers
   case doNotMix
   case duckOthers
+}
+
+enum LoopMode: String, Enumerable {
+  case none
+  case single
+  case all
 }
 
 enum PitchCorrectionQuality: String, Enumerable {
@@ -21,9 +29,9 @@ enum PitchCorrectionQuality: String, Enumerable {
   func toPitchAlgorithm() -> AVAudioTimePitchAlgorithm {
     switch self {
     case .low:
-      return .timeDomain
-    case .medium:
       return .varispeed
+    case .medium:
+      return .timeDomain
     case .high:
       return .spectral
     }
@@ -43,6 +51,18 @@ struct RecordingOptions: Record {
   @Field var linearPCMIsBigEndian: Bool?
   @Field var linearPCMIsFloat: Bool?
   @Field var isMeteringEnabled: Bool = false
+}
+
+struct Metadata: Record {
+  @Field var title: String?
+  @Field var artist: String?
+  @Field var albumTitle: String?
+  @Field var artworkUrl: URL?
+}
+
+struct LockScreenOptions: Record {
+  @Field var showSeekForward: Bool = false
+  @Field var showSeekBackward: Bool = false
 }
 
 enum BitRateStrategy: String, Enumerable {

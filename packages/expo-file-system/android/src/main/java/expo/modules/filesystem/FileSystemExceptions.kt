@@ -1,6 +1,6 @@
 package expo.modules.filesystem
-import expo.modules.interfaces.filesystem.Permission
 import expo.modules.kotlin.exception.CodedException
+import expo.modules.kotlin.services.FilePermissionService
 
 internal class CopyOrMoveDirectoryToFileException :
   CodedException("Unable to copy or move a folder to a file")
@@ -29,7 +29,7 @@ internal class UnableToCreateException(reason: String) :
     "Unable to create file or directory: $reason"
   )
 
-internal class InvalidPermissionException(permission: Permission) :
+internal class InvalidPermissionException(permission: FilePermissionService.Permission) :
   CodedException(
     "Missing '${permission.name}' permission for accessing the file."
   )
@@ -44,10 +44,25 @@ internal class UnableToWriteHandleException(reason: String) :
     "Unable to write to a file handle: '$reason'"
   )
 
+internal class MissingAppContextException :
+  CodedException(
+    "The app context is missing."
+  )
+
 internal class PickerCancelledException :
   CodedException("The file picker was cancelled by the user")
 
 internal class DestinationAlreadyExistsException :
   CodedException(
     "Destination already exists"
+  )
+
+internal class UnableToCopyException(reason: String) :
+  CodedException(
+    "Unable to copy file or directory: $reason"
+  )
+
+internal class UnableToMoveException(reason: String) :
+  CodedException(
+    "Unable to move file or directory: $reason"
   )

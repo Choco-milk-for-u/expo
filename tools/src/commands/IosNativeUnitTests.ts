@@ -30,6 +30,20 @@ export async function iosNativeUnitTests({ packages }: { packages?: string }) {
   const targetsToTest: string[] = [];
   const packagesToTest: string[] = [];
   for (const pkg of allPackages) {
+    if (pkg.packageName === 'expo-modules-core') {
+      if (packageNamesFilter.length > 0 && !packageNamesFilter.includes(pkg.packageName)) {
+        continue;
+      }
+      // @tsapeta @barthap: `expo-modules-core` contains multiple podspecs (Core, JSI, Worklets).
+      // This breaks `expotools` test discovery because it often resolves the wrong `podspecPath`.
+      // We manually include the core tests here as a workaround. If new podspecs are added
+      // to this package, they must be manually registered here.
+      targetsToTest.push(`ExpoModulesCore-Unit-Tests`);
+      targetsToTest.push(`ExpoModulesJSI-Unit-Tests`);
+      packagesToTest.push(pkg.packageName);
+      continue;
+    }
+
     if (!pkg.podspecName || !pkg.podspecPath || !(await pkg.hasNativeTestsAsync('ios'))) {
       if (packageNamesFilter.includes(pkg.packageName)) {
         throw new Error(`The package ${pkg.packageName} does not include iOS unit tests.`);
@@ -61,6 +75,7 @@ export async function iosNativeUnitTests({ packages }: { packages?: string }) {
   }
 
   try {
+    console.log(`Running tests for targets:\n- ${targetsToTest.join('\n- ')}\n`);
     await runTests(targetsToTest);
   } catch (error) {
     console.error('iOS unit tests failed:');

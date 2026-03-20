@@ -1,4 +1,4 @@
-name: Test Suite Lint
+name: Test Suite Lint & Test
 
 on:
   workflow_dispatch: {}
@@ -32,8 +32,10 @@ jobs:
         with:
           yarn-workspace: 'true'
       - name: 🧶 Install workspace node modules
-        if: steps.expo-caches.outputs.yarn-workspace-hit != 'true'
         run: yarn install --frozen-lockfile
       - name: 🚨 Lint test-suite files
         run: yarn lint --max-warnings 0
+        working-directory: apps/test-suite
+      - name: 🧪 Run unit tests
+        run: yarn test
         working-directory: apps/test-suite

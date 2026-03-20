@@ -11,6 +11,38 @@ export type FileCreateOptions = {
   overwrite?: boolean;
 };
 
+export type RelocationOptions = {
+  /**
+   * Whether to overwrite the destination if it exists.
+   * @default false
+   */
+  overwrite?: boolean;
+};
+
+export enum EncodingType {
+  /**
+   * Standard encoding format.
+   */
+  UTF8 = 'utf8',
+  /**
+   * Binary, radix-64 representation.
+   */
+  Base64 = 'base64',
+}
+
+export type FileWriteOptions = {
+  /**
+   * The encoding format to use when writing the file.
+   * @default FileSystem.EncodingType.UTF8
+   */
+  encoding?: EncodingType | 'utf8' | 'base64';
+  /**
+   * Whether to append the contents to the end of the file or overwrite the existing file.
+   * @default false
+   */
+  append?: boolean;
+};
+
 export type DirectoryCreateOptions = {
   /**
    * Whether to create intermediate directories if they do not exist.
@@ -33,6 +65,46 @@ export type DirectoryCreateOptions = {
    */
   idempotent?: boolean;
 };
+
+/**
+ * Specifies the access mode when opening a file handle.
+ * @platform android
+ */
+export enum FileMode {
+  /**
+   * Opens the file for both reading and writing.
+   * The cursor is positioned at the beginning of the file.
+   *
+   * > **Note**: This mode cannot be used with SAF (Storage Access Framework) `content://` URIs.
+   */
+  ReadWrite = 'rw',
+
+  /**
+   * Opens the file for reading only.
+   * The cursor is positioned at the beginning of the file.
+   */
+  ReadOnly = 'r',
+
+  /**
+   * Opens the file for writing only.
+   * The cursor is positioned at the beginning of the file.
+   */
+  WriteOnly = 'w',
+
+  /**
+   * Opens the file for writing only.
+   * The cursor is positioned at the end of the file.
+   *
+   * > **Note**: For SAF files, this is a strict append-only mode.
+   * The cursor cannot be moved; calling `seek()` will have no effect.
+   */
+  Append = 'wa',
+
+  /**
+   * Opens the file for writing only and truncates the file to zero length (wipes content).
+   */
+  Truncate = 'wt',
+}
 
 export declare class Directory {
   /**
@@ -82,12 +154,12 @@ export declare class Directory {
   /**
    * Copies a directory.
    */
-  copy(destination: Directory | File): void;
+  copy(destination: Directory | File, options?: RelocationOptions): void;
 
   /**
    * Moves a directory. Updates the `uri` property that now points to the new location.
    */
-  move(destination: Directory | File): void;
+  move(destination: Directory | File, options?: RelocationOptions): void;
 
   /**
    * Renames a directory.
@@ -164,7 +236,7 @@ export declare class File {
   /**
    * Represents the file URI. The field is read-only, but it may change as a result of calling some methods such as `move`.
    */
-  readonly uri: string;
+  get uri(): string;
 
   /**
    * @hidden This method is not meant to be used directly. It is called by the JS constructor.
@@ -188,7 +260,7 @@ export declare class File {
    * Retrieves content of the file as base64.
    * @returns A promise that resolves with the contents of the file as a base64 string.
    */
-  base64(): string;
+  base64(): Promise<string>;
 
   /**
    * Retrieves content of the file as base64.
@@ -198,13 +270,13 @@ export declare class File {
 
   /**
    * Retrieves byte content of the entire file.
-   * @returns A promise that resolves with the contents of the file as a Uint8Array.
+   * @returns A promise that resolves with the contents of the file as a `Uint8Array`.
    */
   bytes(): Promise<Uint8Array<ArrayBuffer>>;
 
   /**
    * Retrieves byte content of the entire file.
-   * @returns A promise that resolves with the contents of the file as a Uint8Array.
+   * @returns The contents of the file as a `Uint8Array`.
    */
   bytesSync(): Uint8Array;
 
@@ -212,7 +284,7 @@ export declare class File {
    * Writes content to the file.
    * @param content The content to write into the file.
    */
-  write(content: string | Uint8Array): void;
+  write(content: string | Uint8Array, options?: FileWriteOptions): void;
 
   /**
    * Deletes a file.
@@ -244,12 +316,12 @@ export declare class File {
   /**
    * Copies a file.
    */
-  copy(destination: Directory | File): void;
+  copy(destination: Directory | File, options?: RelocationOptions): void;
 
   /**
    * Moves a directory. Updates the `uri` property that now points to the new location.
    */
-  move(destination: Directory | File): void;
+  move(destination: Directory | File, options?: RelocationOptions): void;
 
   /**
    * Renames a file.
@@ -258,17 +330,33 @@ export declare class File {
 
   /**
    * Returns A `FileHandle` object that can be used to read and write data to the file.
+   *
+   * @param mode - The {@link FileMode} to use.
+   * - **Android**: Supports all `FileMode` values, but SAF `content://` URIs do not support `ReadWrite` mode.
+   * - **iOS**: Defaults to `FileMode.ReadWrite`; explicitly passing other modes will be ignored.
+   * - **Defaults**:
+   *   - For SAF `content://` URIs, the default is `FileMode.ReadOnly`.
+   *   - For standard `file://` URIs, the default is `FileMode.ReadWrite`.
+   *
    * @throws Error if the file does not exist or cannot be opened.
    */
-  open(): FileHandle;
+  open(mode?: FileMode): FileHandle;
 
   /**
    * A static method that downloads a file from the network.
    *
+   * On Android, the response body streams directly into the target file. If the download fails after
+   * it starts, a partially written file may remain at the destination. On iOS, the download first
+   * completes in a temporary location and the file is moved into place only after success, so no
+   * file is left behind when the request fails.
+   *
    * @param url - The URL of the file to download.
    * @param destination - The destination directory or file. If a directory is provided, the resulting filename will be determined based on the response headers.
+   * @param options - Download options. When the destination already contains a file, the promise rejects with a `DestinationAlreadyExists` error unless `options.idempotent` is set to `true`. With `idempotent: true`, the download overwrites the existing file instead of failing.
    *
-   * @returns A promise that resolves to the downloaded file.
+   * @returns A promise that resolves to the downloaded file. When the server responds with
+   * a non-2xx HTTP status, the promise rejects with an `UnableToDownload` error whose
+   * message includes the status code. No file is created in that scenario.
    *
    * @example
    * ```ts
@@ -282,13 +370,26 @@ export declare class File {
   ): Promise<File>;
 
   /**
+   * An overload of the `pickFileAsync` method, which picks and returns a single `File`.
+   * This overload requires options to have `multipleFiles` flag be `undefined` or `false`.
+   * @param options options
+   */
+  static pickFileAsync(options?: PickSingleFileOptions): Promise<PickSingleFileResult>;
+  /**
+   * An overload of the `pickFileAsync` method, which picks and returns a list of `File`'s.
+   * This overload requires options to have `multipleFiles` flag be `true`.
+   * @param options options
+   */
+  static pickFileAsync(options?: PickMultipleFilesOptions): Promise<PickMultipleFilesResult>;
+  /**
    * A static method that opens a file picker to select a single file of specified type. On iOS, it returns a temporary copy of the file leaving the original file untouched.
    *
    * Selecting multiple files is not supported yet.
    *
+   * @deprecated Use `pickFileAsync({initialUri, mimeTypes: mimeType})` instead.
    * @param initialUri An optional URI pointing to an initial folder on which the file picker is opened.
    * @param mimeType A mime type that is used to filter out files that can be picked out.
-   * @returns a `File` instance or an array of `File` instances.
+   * @returns A `File` instance or an array of `File` instances.
    */
   static pickFileAsync(initialUri?: string, mimeType?: string): Promise<File | File[]>;
 
@@ -303,12 +404,18 @@ export declare class File {
   md5: string | null;
 
   /**
-   * A last modification time of the file expressed in milliseconds since epoch. Returns a Null if the file does not exist, or it cannot be read.
+   * A last modification time of the file expressed in milliseconds since the epoch. Returns a `null` if the file does not exist, or if it cannot be read.
+   * @deprecated In favor of `lastModified` to be more in line with web [`File`](https://developer.mozilla.org/en-US/docs/Web/API/File)
    */
   modificationTime: number | null;
 
   /**
-   * A creation time of the file expressed in milliseconds since epoch. Returns null if the file does not exist, cannot be read or the Android version is earlier than API 26.
+   * A last modification time of the file expressed in milliseconds since the epoch. Returns a `null` if the file does not exist, or if it cannot be read.
+   */
+  lastModified: number | null;
+
+  /**
+   * A creation time of the file expressed in milliseconds since the epoch. Returns a `null` if the file does not exist, cannot be read or the Android version is earlier than API 26.
    */
   creationTime: number | null;
 
@@ -316,6 +423,12 @@ export declare class File {
    * A mime type of the file. An empty string if the file does not exist, or it cannot be read.
    */
   type: string;
+
+  /**
+   * A content URI to the file that can be shared to external applications.
+   * @platform android
+   */
+  contentUri: string;
 }
 
 export declare class FileHandle {
@@ -324,7 +437,7 @@ export declare class FileHandle {
    */
   close(): void;
   /*
-   * Reads the specified amount of bytes from the file at the current offset.
+   * Reads the specified amount of bytes from the file at the current offset. Max amount of bytes read at once is capped by ArrayBuffer max size (32 bit signed MAX_INT on Android and 64 bit on iOS), but you can read from a FileHandle multiple times.
    * @param length The number of bytes to read.
    */
   readBytes(length: number): Uint8Array<ArrayBuffer>;
@@ -351,7 +464,8 @@ export type FileInfo = {
    */
   exists: boolean;
   /**
-   * A `file://` URI pointing to the file. This is the same as the `fileUri` input parameter.
+   * A URI pointing to the file. This is the same as the `fileUri` input parameter
+   * and preserves its scheme (for example, `file://` or `content://`).
    */
   uri?: string;
   /**
@@ -417,4 +531,77 @@ export type DirectoryInfo = {
    * A list of file names contained within a directory.
    */
   files?: string[];
+};
+
+export type PickFileGeneralOptions = {
+  /**
+   * A URI pointing to an initial folder in which the file picker is opened.
+   */
+  initialUri?: string;
+  /**
+   * The [MIME type(s)](https://en.wikipedia.org/wiki/Media_type) of the documents that are available
+   * to be picked. It also supports wildcards like `'image/*'` to choose any image. To allow any type
+   * of document you can use `'&ast;/*'`.
+   * @default '&ast;/*'
+   */
+  mimeTypes?: string | string[];
+  /**
+   * Allows multiple files to be selected from the system UI.
+   * @default false
+   */
+  multipleFiles?: boolean;
+};
+
+/**
+ * Options for picking a single file.
+ */
+export type PickSingleFileOptions = PickFileGeneralOptions & {
+  multipleFiles?: false;
+};
+
+/**
+ * Options for picking multiple files.
+ */
+export type PickMultipleFilesOptions = PickFileGeneralOptions & {
+  multipleFiles: true;
+};
+
+/**
+ * Options type for file picking.
+ * @hidden
+ */
+export type PickFileOptions = PickSingleFileOptions | PickMultipleFilesOptions;
+
+/**
+ * Result type for picking a single file.
+ */
+export type PickSingleFileResult = PickSingleFileSuccessResult | PickFileCanceledResult;
+
+/**
+ * Result type for picking multiple files.
+ */
+export type PickMultipleFilesResult = PickMultipleFilesSuccessResult | PickFileCanceledResult;
+
+/**
+ * Result type for successfully picking a single file.
+ */
+export type PickSingleFileSuccessResult = {
+  result: File;
+  canceled: false;
+};
+
+/**
+ * Result type for a successful picking multiple files.
+ */
+export type PickMultipleFilesSuccessResult = {
+  result: File[];
+  canceled: false;
+};
+
+/**
+ * Result type for a canceled file pick.
+ */
+export type PickFileCanceledResult = {
+  result: null;
+  canceled: true;
 };

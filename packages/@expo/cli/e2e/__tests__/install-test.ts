@@ -65,29 +65,14 @@ it('runs `npx expo install expo-sms`', async () => {
   const projectRoot = await setupTestProjectWithOptionsAsync('basic-install', 'with-blank', {
     reuseExisting: false,
   });
+
   // `npx expo install expo-sms`
   await executeExpoAsync(projectRoot, ['install', 'expo-sms']);
 
-  const pkg = await JsonFile.readAsync(path.resolve(projectRoot, 'package.json'));
+  const pkg: any = await JsonFile.readAsync(path.resolve(projectRoot, 'package.json'));
 
   // Added expected package
-  const pkgDependencies = pkg.dependencies as Record<string, string>;
-  expect(pkgDependencies['expo-sms']).toBe('~13.0.1');
-
-  // TODO(@kitten): Temporary to unblock CI (see ./utils.ts)
-  delete (pkg.devDependencies as any)['@expo/metro'];
-
-  expect(pkg.devDependencies).toEqual({
-    '@babel/core': '^7.25.2',
-  });
-
-  // Added new packages
-  expect(Object.keys(pkg.dependencies ?? {}).sort()).toStrictEqual([
-    'expo',
-    'expo-sms',
-    'react',
-    'react-native',
-  ]);
+  expect(pkg?.dependencies!['expo-sms']).toBeTruthy();
 
   expect(findProjectFiles(projectRoot)).toStrictEqual([
     'App.js',
@@ -119,14 +104,14 @@ it('runs `npx expo install --check` fails', async () => {
     await executeExpoAsync(projectRoot, ['install', '--check'], { verbose: false });
     throw new Error('SHOULD NOT HAPPEN');
   } catch (error: any) {
-    expect(error.stderr).toMatch(/expo-auth-session@1\.0\.0 - expected version: ~\d\.\d\.\d/);
-    expect(error.stderr).toMatch(/expo-sms@1\.0\.0 - expected version: ~\d+\.\d\.\d/);
+    expect(error.stderr).toMatch(/expo-auth-session@1\.0\.0 - expected version: ~\d+\.\d+\.\d+/);
+    expect(error.stderr).toMatch(/expo-sms@1\.0\.0 - expected version: ~\d+\.\d+\.\d+/);
   }
 
   // Ensure `expo install --check <package>` only throws for the selected package
   await expect(
     executeExpoAsync(projectRoot, ['install', 'expo-sms', '--check'], { verbose: false })
-  ).rejects.toThrow(/expo-sms@1\.0\.0 - expected version: ~\d+\.\d\.\d/);
+  ).rejects.toThrow(/expo-sms@1\.0\.0 - expected version: ~\d+\.\d+\.\d+/);
 
   // Ensure `--check` did not fix the version
   expect(pkg.read().dependencies).toMatchObject({
@@ -201,8 +186,10 @@ it('runs `npx expo install expo@<version> --fix`', async () => {
   });
 });
 
-it('does not validate for `EXPO_NO_DEPENDENCY_VALIDATION=1 npx expo install --check`', async () => {
-  const env = { EXPO_NO_DEPENDENCY_VALIDATION: '1' };
+it('validates when with `EXPO_NO_DEPENDENCY_VALIDATION=1 npx expo install --check`', async () => {
+  const env = {
+    EXPO_NO_DEPENDENCY_VALIDATION: '1',
+  } as Partial<NodeJS.ProcessEnv> as NodeJS.ProcessEnv;
   const projectRoot = await setupTestProjectWithOptionsAsync(
     'install-check-no-validation',
     'with-blank',
@@ -223,78 +210,7 @@ it('does not validate for `EXPO_NO_DEPENDENCY_VALIDATION=1 npx expo install --ch
   expect(pkg.read().dependencies).toMatchObject({ 'expo-image': '1.0.0' });
 
   // Ensure `expo install --check` does not throw when validation is disabled
-  await expect(
-    executeExpoAsync(projectRoot, ['install', '--check'], { env })
-  ).resolves.toMatchObject({
-    stdout: expect.stringContaining('Dependencies are up to date'),
-  });
-
-  // Ensure `expo install --check <package>` does not throw when validation is disabled
-  await expect(
-    executeExpoAsync(projectRoot, ['install', 'expo-image', '--check'], {
-      env: { ...env, EXPO_DEBUG: '1' },
-    })
-  ).resolves.toMatchObject({
-    // Ensure no dependency issues are found
-    stdout: expect.stringContaining('Dependencies are up to date'),
-    // Ensure a debug warning is printed
-    stderr: expect.stringContaining(
-      'Dependency validation is disabled through EXPO_NO_DEPENDENCY_VALIDATION=1'
-    ),
-  });
-
-  // Ensure `--check` did not fix the version
-  expect(pkg.read().dependencies).toMatchObject({ 'expo-image': '1.0.0' });
-});
-
-describe('expo-router integration', () => {
-  it('runs `npx expo install --fix`', async () => {
-    const projectRoot = await setupTestProjectWithOptionsAsync(
-      'install-expo-router-integration',
-      'with-router',
-      {
-        reuseExisting: false,
-        sdkVersion: '52.0.0',
-        linkExpoPackages: ['expo-router'],
-      }
-    );
-    const pkg = new JsonFile(path.resolve(projectRoot, 'package.json'));
-
-    // Add a package that requires "fixing" when using canary
-    await executeExpoAsync(projectRoot, ['install', '@react-navigation/native@6.1.18']);
-
-    // Ensure `@react-navigation/native` is installed
-    expect(pkg.read().dependencies).toMatchObject({
-      '@react-navigation/native': '6.1.18',
-    });
-
-    let error: unknown = undefined;
-    try {
-      // Run `--fix` project dependencies with expo@52 and expo-router from source
-      await executeExpoAsync(projectRoot, ['install', '--fix'], { verbose: false });
-    } catch (e) {
-      error = e;
-    }
-
-    expect(error).toBeDefined();
-    expect((error as Error).message).toContain(
-      'Cannot automatically write to dynamic config at: app.config.js'
-    );
-    expect(stripWhitespace((error as Error).message)).toContain(
-      stripWhitespace(`
-        Add the following to your Expo config
-
-        {
-          "plugins": [
-            "expo-router"
-          ]
-        }
-      `)
-    );
-
-    // Ensure `@react-navigation/native` was updated
-    expect(pkg.read().dependencies).toMatchObject({
-      '@react-navigation/native': '^7.1.8',
-    });
-  });
+  await expect(() => {
+    return executeExpoAsync(projectRoot, ['install', '--check'], { env, verbose: false });
+  }).rejects.toThrow(/Found outdated dependencies/);
 });

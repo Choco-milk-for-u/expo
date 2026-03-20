@@ -7,6 +7,8 @@
  */
 import { parse, StackFrame as UpstreamStackFrame } from 'stacktrace-parser';
 
+import { fetch } from '../../../../utils/fetch';
+
 export type CodeFrame = {
   content: string;
   location?: {
@@ -27,7 +29,9 @@ export type SymbolicatedStackTrace = {
   codeFrame?: CodeFrame;
 };
 
-export type StackFrame = UpstreamStackFrame & { collapse?: boolean };
+export type StackFrame = UpstreamStackFrame & {
+  collapse?: boolean;
+};
 
 const cache: Map<StackFrame[], Promise<SymbolicatedStackTrace>> = new Map();
 
@@ -84,6 +88,9 @@ async function symbolicateStackTrace(stack: UpstreamStackFrame[]): Promise<Symbo
 
   return fetch(baseUrl + '/symbolicate', {
     method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({ stack }),
   }).then((res) => res.json());
 }

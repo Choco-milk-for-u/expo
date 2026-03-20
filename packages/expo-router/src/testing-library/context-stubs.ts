@@ -1,3 +1,4 @@
+import type { LoaderFunction } from 'expo-server';
 import path from 'path';
 
 import requireContext from './require-context-ponyfill';
@@ -9,6 +10,7 @@ export type FileStub =
   | (Record<string, unknown> & {
       default: ReactComponent;
       unstable_settings?: Record<string, any>;
+      loader?: LoaderFunction;
     })
   | ReactComponent;
 

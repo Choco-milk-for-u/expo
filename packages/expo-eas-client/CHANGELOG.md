@@ -6,9 +6,27 @@
 
 ### 🎉 New features
 
+- Add `deterministicUniformValue` constant ([#44075](https://github.com/expo/expo/pull/44075) by [@Ubax](https://github.com/Ubax))
+
 ### 🐛 Bug fixes
 
 ### 💡 Others
+
+## 55.0.2 — 2026-01-26
+
+_This version does not introduce any user-facing changes._
+
+## 55.0.1 — 2026-01-22
+
+_This version does not introduce any user-facing changes._
+
+## 55.0.0 — 2026-01-21
+
+_This version does not introduce any user-facing changes._
+
+## 1.0.8 - 2025-12-05
+
+_This version does not introduce any user-facing changes._
 
 ## 1.0.7 — 2025-09-11
 

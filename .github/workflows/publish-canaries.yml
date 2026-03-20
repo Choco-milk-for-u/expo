@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: 👀 Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'sdk-56' || github.ref }}
       - name: ⬢ Setup Node
         uses: actions/setup-node@v4
         with:
@@ -37,7 +39,6 @@ jobs:
           yarn-workspace: 'true'
           yarn-tools: 'true'
       - name: 🧶 Install workspace node modules
-        if: steps.expo-caches.outputs.yarn-workspace-hit != 'true'
         run: yarn install --frozen-lockfile
       - name: 🧶 Install modules in tools dir
         if: steps.expo-caches.outputs.yarn-tools-hit != 'true'
@@ -48,12 +49,9 @@ jobs:
         env:
           FORCE_COLOR: '2'
       - name: 🔔 Notify on Slack
-        uses: 8398a7/action-slack@v3
+        uses: ./.github/actions/slack-notify
         if: failure() && github.event_name == 'schedule'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SLACK_WEBHOOK_URL: ${{ secrets.slack_webhook_api }}
         with:
-          status: ${{ job.status }}
-          fields: job,message,author,took
+          webhook: ${{ secrets.slack_webhook_api }}
           author_name: Publish Canaries
+          fields: job,message,author,took

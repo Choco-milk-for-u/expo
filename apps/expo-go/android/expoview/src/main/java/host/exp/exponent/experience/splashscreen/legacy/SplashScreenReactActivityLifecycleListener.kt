@@ -3,7 +3,7 @@ package host.exp.exponent.experience.splashscreen.legacy
 import android.app.Activity
 import android.content.Context
 import com.facebook.react.ReactActivity
-import com.facebook.react.ReactNativeHost
+import com.facebook.react.ReactHost
 import com.facebook.react.ReactRootView
 import expo.modules.core.interfaces.ReactActivityHandler
 import expo.modules.core.interfaces.ReactActivityLifecycleListener
@@ -15,23 +15,23 @@ class SplashScreenReactActivityLifecycleListener : ReactActivityLifecycleListene
     SplashScreen.ensureShown(
       activity,
       getResizeMode(activity),
-      ReactRootView::class.java,
-      getStatusBarTranslucent(activity)
+      ReactRootView::class.java
     )
   }
 }
 
 class SplashScreenReactActivityHandler : ReactActivityHandler {
   override fun getDelayLoadAppHandler(
-    activity: ReactActivity,
-    reactNativeHost: ReactNativeHost
+    activity: ReactActivity?,
+    reactHost: ReactHost?
   ): ReactActivityHandler.DelayLoadAppHandler? {
-    SplashScreen.ensureShown(
-      activity,
-      getResizeMode(activity),
-      ReactRootView::class.java,
-      getStatusBarTranslucent(activity)
-    )
+    activity?.let {
+      SplashScreen.ensureShown(
+        it,
+        getResizeMode(it),
+        ReactRootView::class.java
+      )
+    }
     return null
   }
 }
@@ -41,6 +41,3 @@ private fun getResizeMode(context: Context): SplashScreenImageResizeMode =
     context.getString(R.string.expo_splash_screen_resize_mode).lowercase()
   )
     ?: SplashScreenImageResizeMode.CONTAIN
-
-private fun getStatusBarTranslucent(context: Context): Boolean =
-  context.getString(R.string.expo_splash_screen_status_bar_translucent).toBoolean()

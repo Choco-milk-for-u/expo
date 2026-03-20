@@ -17,13 +17,31 @@ import {
   NativeStackNavigationOptions,
 } from '@react-navigation/native-stack';
 import { nanoid } from 'nanoid/non-secure';
-import { ComponentProps, useMemo } from 'react';
+import React, { Children, ComponentProps, useMemo } from 'react';
 
 import { withLayoutContext } from './withLayoutContext';
 import { createNativeStackNavigator } from '../fork/native-stack/createNativeStackNavigator';
 import { useLinkPreviewContext } from '../link/preview/LinkPreviewContext';
-import { getInternalExpoRouterParams, type InternalExpoRouterParams } from '../navigationParams';
+import {
+  getInternalExpoRouterParams,
+  INTERNAL_EXPO_ROUTER_IS_PREVIEW_NAVIGATION_PARAM_NAME,
+  INTERNAL_EXPO_ROUTER_NO_ANIMATION_PARAM_NAME,
+  INTERNAL_EXPO_ROUTER_ZOOM_TRANSITION_SCREEN_ID_PARAM_NAME,
+  INTERNAL_EXPO_ROUTER_ZOOM_TRANSITION_SOURCE_ID_PARAM_NAME,
+  type InternalExpoRouterParams,
+} from '../navigationParams';
 import { SingularOptions, getSingularId } from '../useScreens';
+import {
+  type StackScreenProps,
+  StackHeader,
+  StackScreen,
+  StackSearchBar,
+  StackToolbar,
+  appendScreenStackPropsToOptions,
+  mapProtectedScreen,
+  validateStackPresentation,
+} from './stack-utils';
+import { isChildOfType } from '../utils/children';
 import { Protected } from '../views/Protected';
 
 type GetId = NonNullable<RouterConfigOptions['routeGetIdList'][string]>;
@@ -107,8 +125,21 @@ const isPreviewAction = (action: NavigationAction): action is ExpoNavigationActi
   'params' in action.payload &&
   typeof action.payload.params === 'object' &&
   !!getInternalExpoRouterParams(action.payload?.params ?? undefined)[
-    '__internal__expo_router_is_preview_navigation'
+    INTERNAL_EXPO_ROUTER_IS_PREVIEW_NAVIGATION_PARAM_NAME
   ];
+
+const getZoomTransitionIdFromAction = (action: NavigationAction): string | undefined => {
+  const allParams =
+    !!action.payload && 'params' in action.payload && typeof action.payload.params === 'object'
+      ? action.payload.params
+      : undefined;
+  const internalParams = getInternalExpoRouterParams(allParams ?? undefined);
+  const val = internalParams[INTERNAL_EXPO_ROUTER_ZOOM_TRANSITION_SOURCE_ID_PARAM_NAME];
+  if (val && typeof val === 'string') {
+    return val;
+  }
+  return undefined;
+};
 
 /**
  * React Navigation matches a screen by its name or a 'getID' function that uniquely identifies a screen.
@@ -194,10 +225,12 @@ export const stackRouterOverride: NonNullable<ComponentProps<typeof RNStack>['UN
           }
 
           // START FORK
+          let isPreloadedRoute = false;
           if (isPreviewAction(action) && !route) {
             route = state.preloadedRoutes.find(
               (route) => route.name === action.payload.name && id === route.key
             );
+            isPreloadedRoute = !!route;
           }
           // END FORK
 
@@ -206,6 +239,9 @@ export const stackRouterOverride: NonNullable<ComponentProps<typeof RNStack>['UN
               (route) =>
                 route.name === action.payload.name && id === getId?.({ params: route.params })
             );
+            // START FORK
+            isPreloadedRoute = !!route;
+            // END FORK
           }
 
           let params;
@@ -272,8 +308,9 @@ export const stackRouterOverride: NonNullable<ComponentProps<typeof RNStack>['UN
 
               // If the routes length is the same as the state routes length, then we are navigating to a new route.
               // Otherwise we are replacing an existing route.
+              // For preloaded route, we want to use the same key, so that preloaded screen is used.
               const key =
-                routes.length === state.routes.length && !isPreviewAction(action)
+                routes.length === state.routes.length && !isPreloadedRoute
                   ? `${action.payload.name}-${nanoid()}`
                   : route.key;
 
@@ -325,6 +362,23 @@ export const stackRouterOverride: NonNullable<ComponentProps<typeof RNStack>['UN
             return filterSingular(result, getId);
           }
 
+          const zoomTransitionId = getZoomTransitionIdFromAction(action);
+          if (zoomTransitionId) {
+            const lastRoute = result.routes[result.routes.length - 1];
+            const key = lastRoute.key;
+            const modifiedLastRoute: typeof lastRoute = {
+              ...lastRoute,
+              params: {
+                ...lastRoute.params,
+                [INTERNAL_EXPO_ROUTER_ZOOM_TRANSITION_SCREEN_ID_PARAM_NAME]: key,
+              },
+            };
+            return {
+              ...result,
+              routes: [...result.routes.slice(0, -1), modifiedLastRoute],
+            };
+          }
+
           return result;
           // return {
           //   ...state,
@@ -355,6 +409,8 @@ export const stackRouterOverride: NonNullable<ComponentProps<typeof RNStack>['UN
             );
           }
 
+          const preloadZoomTransitionId = getZoomTransitionIdFromAction(action);
+
           if (route) {
             return {
               ...state,
@@ -362,30 +418,43 @@ export const stackRouterOverride: NonNullable<ComponentProps<typeof RNStack>['UN
                 if (r.key !== route?.key) {
                   return r;
                 }
+                const mergedParams =
+                  routeParamList[action.payload.name] !== undefined
+                    ? {
+                        ...routeParamList[action.payload.name],
+                        ...action.payload.params,
+                      }
+                    : action.payload.params;
                 return {
                   ...r,
-                  params:
-                    routeParamList[action.payload.name] !== undefined
-                      ? {
-                          ...routeParamList[action.payload.name],
-                          ...action.payload.params,
-                        }
-                      : action.payload.params,
+                  params: preloadZoomTransitionId
+                    ? {
+                        ...mergedParams,
+                        [INTERNAL_EXPO_ROUTER_ZOOM_TRANSITION_SCREEN_ID_PARAM_NAME]: r.key,
+                      }
+                    : mergedParams,
                 };
               }),
             };
           } else {
             // START FORK
+            const preloadedRouteKey = `${action.payload.name}-${nanoid()}`;
+            const preloadedRouteParams =
+              routeParamList[action.payload.name] !== undefined
+                ? {
+                    ...routeParamList[action.payload.name],
+                    ...action.payload.params,
+                  }
+                : action.payload.params;
             const currentPreloadedRoute: (typeof state)['preloadedRoutes'][number] = {
-              key: `${action.payload.name}-${nanoid()}`,
+              key: preloadedRouteKey,
               name: action.payload.name,
-              params:
-                routeParamList[action.payload.name] !== undefined
-                  ? {
-                      ...routeParamList[action.payload.name],
-                      ...action.payload.params,
-                    }
-                  : action.payload.params,
+              params: preloadZoomTransitionId
+                ? {
+                    ...preloadedRouteParams,
+                    [INTERNAL_EXPO_ROUTER_ZOOM_TRANSITION_SCREEN_ID_PARAM_NAME]: preloadedRouteKey,
+                  }
+                : preloadedRouteParams,
             };
             // END FORK
             return {
@@ -490,25 +559,69 @@ function filterSingular<
   };
 }
 
+/**
+ * Renders a native stack navigator.
+ *
+ * @hideType
+ */
 const Stack = Object.assign(
   (props: ComponentProps<typeof RNStack>) => {
     const { isStackAnimationDisabled } = useLinkPreviewContext();
 
+    const screenOptionsWithCompositionAPIOptions = useMemo<NativeStackScreenOptions>(() => {
+      const stackHeader = Children.toArray(props.children).find((child) =>
+        isChildOfType(child, StackHeader)
+      );
+      if (stackHeader) {
+        const screenStackProps: StackScreenProps = { children: stackHeader };
+        const currentOptions = props.screenOptions;
+        if (currentOptions) {
+          if (typeof currentOptions === 'function') {
+            return (...args) => {
+              const options = currentOptions(...args);
+              return appendScreenStackPropsToOptions(options, screenStackProps);
+            };
+          }
+          return appendScreenStackPropsToOptions(currentOptions, screenStackProps);
+        } else {
+          return appendScreenStackPropsToOptions({}, screenStackProps);
+        }
+      } else if (props.screenOptions) {
+        const screenOptions = props.screenOptions;
+        if (typeof screenOptions === 'function') {
+          return validateStackPresentation(screenOptions);
+        }
+        return validateStackPresentation(screenOptions);
+      }
+      return props.screenOptions;
+    }, [props.screenOptions, props.children]);
+
     const screenOptions = useMemo(() => {
       const condition = isStackAnimationDisabled ? () => true : shouldDisableAnimationBasedOnParams;
 
-      return disableAnimationInScreenOptions(props.screenOptions, condition);
-    }, [props.screenOptions, isStackAnimationDisabled]);
+      return disableAnimationInScreenOptions(screenOptionsWithCompositionAPIOptions, condition);
+    }, [screenOptionsWithCompositionAPIOptions, isStackAnimationDisabled]);
+
+    const rnChildren = useMemo(
+      () => mapProtectedScreen({ guard: true, children: props.children }).children,
+      [props.children]
+    );
 
     return (
-      <RNStack {...props} screenOptions={screenOptions} UNSTABLE_router={stackRouterOverride} />
+      <RNStack
+        {...props}
+        children={rnChildren}
+        screenOptions={screenOptions}
+        UNSTABLE_router={stackRouterOverride}
+      />
     );
   },
   {
-    Screen: RNStack.Screen as (
-      props: ComponentProps<typeof RNStack.Screen> & { singular?: boolean }
-    ) => null,
+    Screen: StackScreen,
     Protected,
+    Header: StackHeader,
+    SearchBar: StackSearchBar,
+    Toolbar: StackToolbar,
   }
 );
 
@@ -543,7 +656,7 @@ function disableAnimationInScreenOptions(
 
 function shouldDisableAnimationBasedOnParams(route: RouteProp<ParamListBase, string>): boolean {
   const expoParams = getInternalExpoRouterParams(route.params);
-  return !!expoParams.__internal_expo_router_no_animation;
+  return !!expoParams[INTERNAL_EXPO_ROUTER_NO_ANIMATION_PARAM_NAME];
 }
 
 export default Stack;

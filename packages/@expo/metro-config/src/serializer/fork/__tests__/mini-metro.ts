@@ -4,7 +4,7 @@ import type {
   Module,
   ReadOnlyGraph,
   SerializerOptions,
-} from '@expo/metro/metro/DeltaBundler/types.flow';
+} from '@expo/metro/metro/DeltaBundler/types';
 import CountingSet from '@expo/metro/metro/lib/CountingSet';
 import metroConfigDefaults from '@expo/metro/metro-config/defaults';
 import * as path from 'path';
@@ -52,12 +52,25 @@ export async function microBundle({
       'react-server-dom-webpack/server',
       'react-server-dom-webpack/client',
       'expo-router/rsc/internal',
+      'react/compiler-runtime',
     ]) {
       if (id === mid && !fullFs[mid]) {
         fullFs[mid] = `
                 module.exports = () => 'MOCK'
             `;
         return mid;
+      }
+    }
+
+    // Handle node_modules subpath imports like 'react/compiler-runtime'
+    if (!id.startsWith('.') && !id.startsWith('/')) {
+      const nodeModulePath = 'node_modules/' + id + '.js';
+      if (fullFs[nodeModulePath] != null) {
+        return nodeModulePath;
+      }
+      const nodeModuleIndexPath = 'node_modules/' + id + '/index.js';
+      if (fullFs[nodeModuleIndexPath] != null) {
+        return nodeModuleIndexPath;
       }
     }
 
@@ -82,12 +95,12 @@ export async function microBundle({
     isServer?: boolean;
     isReactServer?: boolean;
     inlineSourceMaps?: boolean;
-    hot?: boolean;
     minify?: boolean;
     splitChunks?: boolean;
     treeshake?: boolean;
     optimize?: boolean;
     inlineRequires?: boolean;
+    reactCompiler?: boolean;
   };
   preModulesFs?: Record<string, string>;
 }): Promise<
@@ -102,6 +115,9 @@ export async function microBundle({
     'expo-router/rsc/internal': ``,
     'react-server-dom-webpack/server': ``,
     'react-server-dom-webpack/client': ``,
+    'react/compiler-runtime': `
+    module.exports.c = function c(size) { return new Array(size); };
+`,
 
     'expo-mock/async-require': `
     module.exports = () => 'MOCK'
@@ -122,7 +138,6 @@ export async function microBundle({
   const absEntry = path.join(projectRoot, entry);
   const dev = options.dev ?? true;
   const transformOptions: PickPartial<JsTransformOptions, 'inlinePlatform' | 'inlineRequires'> = {
-    hot: options.hot ?? false,
     minify: options.minify ?? false,
     dev,
     type: 'module',
@@ -136,6 +151,7 @@ export async function microBundle({
       engine: options.hermes ? 'hermes' : undefined,
       environment: options.isReactServer ? 'react-server' : options.isServer ? 'node' : undefined,
       optimize: options.optimize ?? options.treeshake,
+      reactCompiler: options.reactCompiler,
     },
     // NOTE: This is non-standard but it provides a cleaner output
     experimentalImportSupport: true,

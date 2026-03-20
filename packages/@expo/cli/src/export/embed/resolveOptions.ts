@@ -1,5 +1,5 @@
 import { resolveEntryPoint } from '@expo/config/paths';
-import type { OutputOptions } from '@expo/metro/metro/shared/types.flow';
+import type { OutputOptions } from '@expo/metro/metro/shared/types';
 import canonicalize from '@expo/metro/metro-core/canonicalize';
 import arg from 'arg';
 import os from 'os';
@@ -30,6 +30,7 @@ export interface Options {
   unstableTransformProfile?: string;
   eager?: boolean;
   bytecode?: boolean;
+  skipServer?: boolean;
 }
 
 function assertIsBoolean(val: any): asserts val is boolean {
@@ -81,6 +82,7 @@ export function resolveOptions(
     minify: parsed.args['--minify'] as boolean | undefined,
     eager: !!parsed.args['--eager'],
     bytecode: parsed.args['--bytecode'] as boolean | undefined,
+    skipServer: !!parsed.args['--skip-server'],
   };
 
   if (commonOptions.eager) {

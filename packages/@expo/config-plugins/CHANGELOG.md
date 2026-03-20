@@ -6,9 +6,64 @@
 
 ### 🎉 New features
 
+- Added optional `codeSignIdentity` parameter to `setProvisioningProfileForPbxproj` to allow callers to specify the code signing identity instead of always using `"iPhone Distribution"`. ([#43986](https://github.com/expo/expo/pull/43986) by [@qwertey6](https://github.com/qwertey6))
+
 ### 🐛 Bug fixes
 
 ### 💡 Others
+
+## 55.0.6 — 2026-02-25
+
+### 💡 Others
+
+- Deprecated and turned into no-ops the `androidStatusBar.backgroundColor` and `androidStatusBar.translucent` app config properties. ([#43276](https://github.com/expo/expo/pull/43276) by [@zoontek](https://github.com/zoontek))
+
+## 55.0.5 — 2026-02-16
+
+_This version does not introduce any user-facing changes._
+
+## 55.0.4 — 2026-02-03
+
+_This version does not introduce any user-facing changes._
+
+## 55.0.3 — 2026-01-26
+
+### 💡 Others
+
+- Drop `slash` dependency ([#42484](https://github.com/expo/expo/pull/42484) by [@kitten](https://github.com/kitten))
+
+## 55.0.2 — 2026-01-22
+
+_This version does not introduce any user-facing changes._
+
+## 55.0.1 — 2026-01-22
+
+### 🐛 Bug fixes
+
+- Add `android:maxSdkVersion="32"` to storage permissions in templates. ([#42401](https://github.com/expo/expo/pull/42401) by [@brentvatne](https://github.com/brentvatne))
+
+## 55.0.0 — 2026-01-21
+
+### 🎉 New features
+
+- [iOS] Add `locales` support for `Localizable.strings`. ([#39022](https://github.com/expo/expo/pull/39022) by [@desii101](https://github.com/desii101))
+
+### 💡 Others
+
+- Remove `newArchEnabled` option. ([#41684](https://github.com/expo/expo/pull/41684) by [@gabrieldonadel](https://github.com/gabrieldonadel))
+- Updated maps config-plugin to support `@main` as the anchor. ([#41868](https://github.com/expo/expo/pull/41868) by [@kudo](https://github.com/kudo))
+
+## 54.0.3 - 2025-12-04
+
+### 💡 Others
+
+- Update to `glob@^13.0.0` ([#41079](https://github.com/expo/expo/pull/41079) by [@kitten](https://github.com/kitten))
+
+## 54.0.2 - 2025-10-01
+
+### 🎉 New features
+
+- add functions for android resource name validation ([#39882](https://github.com/expo/expo/pull/39882) by [@vonovak](https://github.com/vonovak))
 
 ## 54.0.1 — 2025-09-11
 

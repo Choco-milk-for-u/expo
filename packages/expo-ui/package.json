@@ -1,8 +1,10 @@
 {
   "name": "@expo/ui",
-  "version": "0.2.0-beta.3",
+  "version": "55.0.1",
   "description": "A collection of UI components",
-  "sideEffects": false,
+  "sideEffects": [
+    "*.fx.js"
+  ],
   "exports": {
     "./package.json": "./package.json",
     "./swift-ui": {
@@ -17,9 +19,13 @@
       "types": "./build/jetpack-compose/index.d.ts",
       "default": "./src/jetpack-compose/index.ts"
     },
-    "./jetpack-compose-primitives": {
-      "types": "./build/jetpack-compose-primitives/index.d.ts",
-      "default": "./src/jetpack-compose-primitives/index.tsx"
+    "./jetpack-compose/modifiers": {
+      "types": "./build/jetpack-compose/modifiers/index.d.ts",
+      "default": "./src/jetpack-compose/modifiers/index.ts"
+    },
+    "./datetimepicker": {
+      "types": "./build/datetime-picker/index.d.ts",
+      "default": "./src/datetime-picker/index.tsx"
     }
   },
   "scripts": {
@@ -50,8 +56,11 @@
     "sf-symbols-typescript": "^2.1.0"
   },
   "devDependencies": {
-    "@types/react": "~19.1.10",
-    "expo-module-scripts": "^5.0.7"
+    "@types/react": "~19.2.0",
+    "expo-module-scripts": "^55.0.2"
+  },
+  "jest": {
+    "preset": "expo-module-scripts"
   },
   "peerDependencies": {
     "expo": "*",

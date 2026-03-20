@@ -3,6 +3,7 @@
 import spawnAsync from '@expo/spawn-async';
 import { rmSync, existsSync } from 'fs';
 import fs from 'fs/promises';
+import { glob } from 'glob';
 import nullthrows from 'nullthrows';
 import path from 'path';
 
@@ -32,17 +33,19 @@ function getExpoDependencyChunks({
   includeSplashScreen: boolean;
 }) {
   return [
-    ['@expo/config-types', '@expo/env', '@expo/json-file'],
+    ['@expo/config-types', '@expo/env', '@expo/json-file', '@expo/require-utils'],
     ['@expo/config'],
     ['@expo/config-plugins'],
     ['@expo/plist'],
+    ['@expo/local-build-cache-provider'],
     ['expo-modules-core'],
     ['unimodules-app-loader'],
     ['expo-task-manager'],
-    ['@expo/cli', 'expo', 'expo-asset', 'expo-modules-autolinking'],
+    ['@expo/cli', 'expo', 'expo-asset', 'expo-modules-autolinking', '@expo/inline-modules'],
     ['expo-manifests'],
     ['@expo/prebuild-config', '@expo/metro-config', 'expo-constants'],
     ['@expo/image-utils'],
+    ['@expo/dom-webview', '@expo/log-box'],
     [
       'babel-preset-expo',
       'expo-application',
@@ -66,7 +69,6 @@ function getExpoDependencyChunks({
           [
             'expo-app-integrity',
             'expo-audio',
-            'expo-av',
             'expo-background-task',
             'expo-blur',
             'expo-crypto',
@@ -226,6 +228,25 @@ async function copyCommonFixturesToProject(
   // copy .prettierrc
   await fs.copyFile(path.resolve(repoRoot, '.prettierrc'), path.join(projectRoot, '.prettierrc'));
 
+  if (!isTV) {
+    // Copy react-native patch
+    await fs.mkdir(path.join(projectRoot, 'patches'));
+    const patchFile = await glob('react-native+*.patch', {
+      cwd: path.join(repoRoot, 'patches'),
+      absolute: true,
+    });
+    const reactNativeJsonString = await fs.readFile(
+      path.join(projectRoot, 'node_modules', 'react-native', 'package.json'),
+      'utf-8'
+    );
+    const reactNativeJson = JSON.parse(reactNativeJsonString);
+    const reactNativeVersion = reactNativeJson.version;
+    const patchFileName = `react-native+${reactNativeVersion}.patch`;
+    if (patchFile.length > 0) {
+      await fs.copyFile(patchFile[0], path.join(projectRoot, 'patches', patchFileName));
+    }
+  }
+
   // Modify specific files for TV
   if (isTV) {
     // Add TV environment variable to EAS build config
@@ -343,7 +364,7 @@ async function preparePackageJson(
           'set -o pipefail && xcodebuild -workspace ios/updatese2e.xcworkspace -scheme updatese2e -configuration Debug -sdk appletvsimulator -arch arm64 -derivedDataPath ios/build | npx @expo/xcpretty',
         postinstall: 'patch-package',
         'start:dev-client':
-          'npx expo start --private-key-path ./keys/private-key.pem > /dev/null 2>&1 &',
+          'CI=false npx expo start --private-key-path ./keys/private-key.pem > /dev/null 2>&1 &',
         ...extraScriptsGenerateTestUpdateBundlesPart,
       }
     : extraScriptsAssetExclusion;
@@ -397,8 +418,8 @@ async function preparePackageJson(
       ...packageJson,
       dependencies: {
         ...packageJson.dependencies,
-        'react-native': 'npm:react-native-tvos@0.81.4-0',
-        '@react-native-tvos/config-tv': '^0.1.4',
+        'react-native': 'npm:react-native-tvos@0.84.0-0',
+        '@react-native-tvos/config-tv': '^0.1.5',
       },
       expo: {
         install: {

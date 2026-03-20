@@ -1,9 +1,20 @@
-#!/usr/bin/env bash
+#!/usr/bin/env node
 
-set -eo pipefail
+process.env.EXPO_NONINTERACTIVE = 1;
 
-script_dir="$(dirname "$0")"
+import { commandRunner } from '../utils/commandUtils.js';
 
-export EXPO_NONINTERACTIVE=1
+async function runAsync() {
+  console.log('Preparing module for publishing');
+  await commandRunner(path.join(dirname, 'expo-module-clean'));
+  await commandRunner(path.join(dirname, 'expo-module-build'));
+}
 
-"$script_dir/npx" proofread
+(async () => {
+  try {
+    await runAsync();
+  } catch (error) {
+    console.error(error);
+    process.exit(error.status || error.code || 1);
+  }
+})();

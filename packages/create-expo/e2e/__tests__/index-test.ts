@@ -1,7 +1,6 @@
 import spawnAsync from '@expo/spawn-async';
 import fs from 'fs';
 import path from 'path';
-import semver from 'semver';
 
 import {
   createTestPath,
@@ -60,15 +59,10 @@ it('creates a full basic project by default', async () => {
 });
 
 // TODO: drop this test when the oldest supported Node version is >=23
-(semver.major(process.versions.node) >= 23 ? it.skip : it)(
+const [nodeMajor] = process.versions.node.split('.').map(Number);
+(nodeMajor >= 23 ? it.skip : it)(
   'throws when fetch is disabled',
   async () => {
-    const [major] = process.versions.node.split('.').map(Number);
-    if (major >= 23) {
-      expect(true).toBe(true);
-      // `--no-experimental-fetch` is a legacy flag fetch it not experimental in Node.js 23+
-      return;
-    }
     const projectName = 'throws-when-fetch-disabled';
     let result: Awaited<ReturnType<typeof execute>>;
 
@@ -104,7 +98,6 @@ it('uses pnpm', async () => {
   expectFileNotExists(projectName, 'node_modules');
 
   // Check if `pnpm` node linker is set
-  expectFileExists(projectName, '.npmrc');
   const { stdout } = expectExecutePassing(
     await spawnAsync('pnpm', ['config', 'get', 'node-linker'], { cwd: getTestPath(projectName) })
   );

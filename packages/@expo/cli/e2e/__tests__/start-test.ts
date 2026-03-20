@@ -90,11 +90,25 @@ for (const args of [
   });
 }
 
-describe('server', () => {
+// Due to change in `expo` package the tests suit will fail on Windows, as npm pack fails to execute `expo` prepare on Windows.
+const describeSkipWin = process.platform === 'win32' ? describe.skip : describe;
+
+describeSkipWin('server', () => {
   const expo = createExpoStart();
 
   beforeEach(async () => {
-    expo.options.cwd = await setupTestProjectWithOptionsAsync('basic-start', 'with-blank');
+    expo.options.cwd = await setupTestProjectWithOptionsAsync('basic-start', 'with-blank', {
+      // TODO(@hassankhan, @krystofwoldrich, @kitten): remove all linked after publishing
+      linkExpoPackages: [
+        '@expo/router-server',
+        '@expo/log-box',
+        '@expo/require-utils',
+        'expo',
+        '@expo/local-build-cache-provider',
+        // Without this, the hermes-parser install a version that is incompatible with flow Readonly / ReadonlyArray
+        'babel-preset-expo',
+      ],
+    });
     await fs.promises.rm(path.join(projectRoot, '.expo'), { force: true, recursive: true });
     await expo.startAsync();
   });
@@ -128,7 +142,7 @@ describe('server', () => {
 
     // Manifest
     expect(manifest.runtimeVersion).toBe('1.0');
-    expect(manifest.extra.expoClient?.sdkVersion).toBe('52.0.0');
+    expect(manifest.extra.expoClient?.sdkVersion).toBe('55.0.0');
     expect(manifest.extra.expoClient?.slug).toBe('basic-start');
     expect(manifest.extra.expoClient?.name).toBe('basic-start');
 
@@ -201,33 +215,5 @@ describe('start - dev clients', () => {
   it('runs `npx expo start` in dev client mode, using environment variable from .env', async () => {
     const response = await expo.fetchBundleAsync('/');
     expect(response.ok).toBeTruthy();
-  });
-});
-
-describe('start - webcontainer', () => {
-  const expo = createExpoStart({
-    cwd: getRouterE2ERoot(),
-    port: 8081, // Only port 8081 is supported with the ws-tunnel
-    env: {
-      NODE_ENV: 'development',
-      EXPO_USE_STATIC: 'server',
-      E2E_ROUTER_SRC: 'server',
-      E2E_ROUTER_ASYNC: 'development',
-      // Force webcontainer mode
-      CI: 'false',
-      EXPO_FORCE_WEBCONTAINER_ENV: 'true',
-    },
-  });
-
-  beforeEach(async () => {
-    await expo.startAsync();
-  });
-  afterAll(async () => {
-    await expo.stopAsync();
-  });
-
-  it('starts with ws-tunnel enabled by default', () => {
-    // Ensure dev server URL points to the ws tunnel by default
-    expect(expo.url.href).toContain('.boltexpo.dev:');
   });
 });

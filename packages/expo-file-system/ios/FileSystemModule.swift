@@ -116,7 +116,8 @@ public final class FileSystemModule: Module {
         picker: createDirectoryPicker(initialUri: initialUri),
         isDirectory: true,
         initialUri: initialUri,
-        mimeType: nil,
+        mimeTypes: [],
+        multipleDocuments: false,
         promise: promise
       )
       #else
@@ -124,30 +125,30 @@ public final class FileSystemModule: Module {
       #endif
     }.runOnQueue(.main)
 
-    AsyncFunction("pickFileAsync") { (initialUri: URL?, mimeType: String?, promise: Promise) in
+    AsyncFunction("pickFileAsync") { (options: FilePickingOptions?, promise: Promise) in
       #if os(iOS)
       filePickingHandler.presentDocumentPicker(
-        picker: createFilePicker(initialUri: initialUri, mimeType: mimeType),
+        picker: createFilePicker(initialUri: options?.initialUri, mimeTypes: options?.mimeTypes ?? []),
         isDirectory: false,
-        initialUri: initialUri,
-        mimeType: mimeType,
+        initialUri: options?.initialUri,
+        mimeTypes: options?.mimeTypes ?? [],
+        multipleDocuments: options?.multipleFiles ?? false,
         promise: promise
       )
       #else
       promise.reject(FeatureNotAvailableOnPlatformException())
       #endif
     }.runOnQueue(.main)
-
     Function("info") { (url: URL) in
       let output = PathInfo()
       output.exists = false
       output.isDirectory = nil
 
-      guard let permissionsManager: EXFilePermissionModuleInterface = appContext?.legacyModule(implementing: EXFilePermissionModuleInterface.self) else {
+      guard let fileSystemManager = appContext?.fileSystem else {
         return output
       }
 
-      if permissionsManager.getPathPermissions(url.path).contains(.read) {
+      if fileSystemManager.getPathPermissions(url.path).contains(.read) {
         var isDirectory: ObjCBool = false
         if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) {
           output.exists = true
@@ -194,7 +195,7 @@ public final class FileSystemModule: Module {
         return try file.bytes()
       }
 
-      Function("open") { file in
+      Function("open") { (file, _mode: String?) in
         return try FileSystemFileHandle(file: file)
       }
 
@@ -202,12 +203,20 @@ public final class FileSystemModule: Module {
         return try file.info(options: options ?? InfoOptions())
       }
 
-      Function("write") { (file, content: Either<String, TypedArray>) in
+      Function("write") { (file: FileSystemFile, content: Either<String, TypedArray>, options: WriteOptions?) in
+        let append = options?.append ?? false
         if let content: String = content.get() {
-          try file.write(content)
+          if options?.encoding == WriteEncoding.base64 {
+            guard let data = Data(base64Encoded: content, options: .ignoreUnknownCharacters) else {
+              throw UnableToWriteBase64DataException(file.url.absoluteString)
+            }
+            try file.write(data, append: append)
+          } else {
+            try file.write(content, append: append)
+          }
         }
         if let content: TypedArray = content.get() {
-          try file.write(content)
+          try file.write(content, append: append)
         }
       }
 
@@ -220,6 +229,10 @@ public final class FileSystemModule: Module {
       }
 
       Property("modificationTime") { file in
+        try? file.modificationTime
+      }
+
+      Property("lastModified") { file in
         try? file.modificationTime
       }
 
@@ -243,12 +256,12 @@ public final class FileSystemModule: Module {
         try file.create(options ?? CreateOptions())
       }
 
-      Function("copy") { (file, to: FileSystemPath) in
-        try file.copy(to: to)
+      Function("copy") { (file, to: FileSystemPath, options: RelocationOptions?) in
+        try file.copy(to: to, options: options ?? RelocationOptions())
       }
 
-      Function("move") { (file, to: FileSystemPath) in
-        try file.move(to: to)
+      Function("move") { (file, to: FileSystemPath, options: RelocationOptions?) in
+        try file.move(to: to, options: options ?? RelocationOptions())
       }
 
       Function("rename") { (file, newName: String) in
@@ -311,12 +324,12 @@ public final class FileSystemModule: Module {
         try directory.create(options ?? CreateOptions())
       }
 
-      Function("copy") { (directory, to: FileSystemPath) in
-        try directory.copy(to: to)
+      Function("copy") { (directory, to: FileSystemPath, options: RelocationOptions?) in
+        try directory.copy(to: to, options: options ?? RelocationOptions())
       }
 
-      Function("move") { (directory, to: FileSystemPath) in
-        try directory.move(to: to)
+      Function("move") { (directory, to: FileSystemPath, options: RelocationOptions?) in
+        try directory.move(to: to, options: options ?? RelocationOptions())
       }
 
       Function("rename") { (directory, newName: String) in
@@ -326,6 +339,18 @@ public final class FileSystemModule: Module {
       // this function is internal and will be removed in the future (when returning arrays of shared objects is supported)
       Function("listAsRecords") { directory in
         try directory.listAsRecords()
+      }
+
+      Function("createFile") { (directory, name: String, content: String?) in
+        let file = FileSystemFile(url: directory.url.appendingPathComponent(name))
+        try file.create(CreateOptions())
+        return file
+      }
+
+      Function("createDirectory") { (directory, name: String) in
+        let newDirectory = FileSystemDirectory(url: directory.url.appendingPathComponent(name))
+        try newDirectory.create(CreateOptions())
+        return newDirectory
       }
 
       Property("uri") { directory in

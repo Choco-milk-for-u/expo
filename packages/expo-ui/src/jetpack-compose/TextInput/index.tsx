@@ -1,8 +1,8 @@
 import { requireNativeView } from 'expo';
 import { Ref } from 'react';
-import { StyleProp, ViewStyle } from 'react-native';
 
 import { ExpoModifier, ViewEvent } from '../../types';
+import { createViewModifierEventListener } from '../modifiers/utils';
 
 /**
  * @hidden Not used anywhere yet.
@@ -13,19 +13,25 @@ export type TextInputRef = {
   setText: (newText: string) => Promise<void>;
 };
 
+export type TextInputVariant = 'filled' | 'outlined';
+
 export type TextInputProps = {
   /**
    * Can be used for imperatively setting text on the TextInput component.
    */
   ref?: Ref<TextInputRef>;
   /**
-   * Additional styles to apply to the TextInput.
-   */
-  style?: StyleProp<ViewStyle>;
-  /**
    * Initial value that the TextInput displays when being mounted. As the TextInput is an uncontrolled component, change the key prop if you need to change the text value.
    */
   defaultValue?: string;
+  /**
+   * The visual style of the text input field.
+   * - `filled` - A text field with a filled background (default).
+   * - `outlined` - A text field with a transparent background and a border outline.
+   * @default filled
+   * @platform android
+   */
+  variant?: TextInputVariant;
   /**
    * A callback triggered when user types in text into the TextInput.
    */
@@ -84,7 +90,9 @@ export type TextInputProps = {
    */
   autoCapitalize?: 'characters' | 'none' | 'sentences' | 'unspecified' | 'words';
 
-  /** Modifiers for the component */
+  /**
+   * Modifiers for the component.
+   */
   modifiers?: ExpoModifier[];
 };
 
@@ -99,17 +107,15 @@ const TextInputNativeView: React.ComponentType<NativeTextInputProps> = requireNa
   'TextInputView'
 );
 
-/**
- * @hidden
- */
 function transformTextInputProps(props: TextInputProps): NativeTextInputProps {
+  const { modifiers, ...restProps } = props;
   return {
-    ...props,
+    modifiers,
+    ...(modifiers ? createViewModifierEventListener(modifiers) : undefined),
+    ...restProps,
     onValueChanged: (event) => {
       props.onChangeText?.(event.nativeEvent.value);
     },
-    // @ts-expect-error
-    modifiers: props.modifiers?.map((m) => m.__expo_shared_object_id__),
   };
 }
 
@@ -117,5 +123,5 @@ function transformTextInputProps(props: TextInputProps): NativeTextInputProps {
  * Renders a `TextInput` component.
  */
 export function TextInput(props: TextInputProps) {
-  return <TextInputNativeView {...transformTextInputProps(props)} style={props.style} />;
+  return <TextInputNativeView {...transformTextInputProps(props)} />;
 }

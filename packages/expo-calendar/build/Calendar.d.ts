@@ -1,6 +1,8 @@
 import { PermissionResponse } from 'expo-modules-core';
 export { PermissionResponse, PermissionStatus, PermissionHookOptions, PermissionExpiration, } from 'expo-modules-core';
 /**
+ * Options for specifying a particular instance of a recurring event.
+ * This type is used in various methods that operate on recurring events, such as updating or deleting a single occurrence or a set of future occurrences.
  * @platform ios
  */
 export type RecurringEventOptions = {
@@ -18,7 +20,7 @@ export type RecurringEventOptions = {
      */
     instanceStartDate?: string | Date;
 };
-type Organizer = {
+export type Organizer = {
     isCurrentUser: boolean;
     name?: string;
     role: string;
@@ -882,7 +884,7 @@ export declare const useCalendarPermissions: (options?: import("expo-modules-cor
  */
 export declare const useRemindersPermissions: (options?: import("expo-modules-core").PermissionHookOptions<object> | undefined) => [PermissionResponse | null, () => Promise<PermissionResponse>, () => Promise<PermissionResponse>];
 /**
- * platform ios
+ * @platform ios
  */
 export declare enum EntityTypes {
     EVENT = "event",

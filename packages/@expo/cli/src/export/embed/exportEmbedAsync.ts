@@ -7,8 +7,8 @@
 import { getConfig } from '@expo/config';
 import Server from '@expo/metro/metro/Server';
 import splitBundleOptions from '@expo/metro/metro/lib/splitBundleOptions';
-import output from '@expo/metro/metro/shared/output/bundle';
-import type { BundleOptions } from '@expo/metro/metro/shared/types.flow';
+import * as output from '@expo/metro/metro/shared/output/bundle';
+import type { BundleOptions } from '@expo/metro/metro/shared/types';
 import getMetroAssets from '@expo/metro-config/build/transform-worker/getAssets';
 import assert from 'assert';
 import fs from 'fs';
@@ -26,7 +26,7 @@ import { getMetroDirectBundleOptionsForExpoConfig } from '../../start/server/mid
 import { stripAnsi } from '../../utils/ansi';
 import { copyAsync, removeAsync } from '../../utils/dir';
 import { env } from '../../utils/env';
-import { setNodeEnv } from '../../utils/nodeEnv';
+import { setNodeEnv, loadEnvFiles } from '../../utils/nodeEnv';
 import { exportDomComponentAsync } from '../exportDomComponents';
 import { isEnableHermesManaged } from '../exportHermes';
 import { persistMetroAssetsAsync } from '../persistMetroAssets';
@@ -37,15 +37,6 @@ import { ensureProcessExitsAfterDelay } from '../../utils/exit';
 import { resolveRealEntryFilePath } from '../../utils/filePath';
 
 const debug = require('debug')('expo:export:embed');
-
-/**
- * Extended type for the Metro server build result to support the `code` property as a `Buffer`.
- */
-type ExtendedMetroServerBuildResult =
-  | Awaited<ReturnType<Server['build']>>
-  | {
-      code: string | Buffer;
-    };
 
 function guessCopiedAppleBundlePath(bundleOutput: string) {
   // Ensure the path is familiar before guessing.
@@ -77,7 +68,7 @@ export async function exportEmbedAsync(projectRoot: string, options: Options) {
   }
 
   setNodeEnv(options.dev ? 'development' : 'production');
-  require('@expo/env').load(projectRoot);
+  loadEnvFiles(projectRoot);
 
   // This is an optimized codepath that can occur during `npx expo run` and does not occur during builds from Xcode or Android Studio.
   // Here we reconcile a bundle pass that was run before the native build process. This order can fail faster and is show better errors since the logs won't be obscured by Xcode and Android Studio.
@@ -145,7 +136,6 @@ export async function exportEmbedInternalAsync(projectRoot: string, options: Opt
 
   // Persist bundle and source maps.
   await Promise.all([
-    // @ts-expect-error: The `save()` method from metro is typed to support `code: string` only but it also supports `Buffer` actually.
     output.save(bundle, options, Log.log),
 
     // Write dom components proxy files.
@@ -174,7 +164,7 @@ export async function exportEmbedBundleAndAssetsAsync(
   projectRoot: string,
   options: Options
 ): Promise<{
-  bundle: ExtendedMetroServerBuildResult;
+  bundle: Awaited<ReturnType<Server['build']>>;
   assets: readonly BundleAssetWithFileHashes[];
   files: ExportAssetMap;
 }> {
@@ -225,10 +215,12 @@ export async function exportEmbedBundleAndAssetsAsync(
       }
     );
 
+    // We optimistically build the server-side API routes code here, to ensure they're
+    // valid or to enable parallel deployment in the future (TBD). This is disabled using
+    // the explicit `--skip-server` flag.
     const apiRoutesEnabled =
       devServer.isReactServerComponentsEnabled || exp.web?.output === 'server';
-
-    if (apiRoutesEnabled) {
+    if (!options.skipServer && apiRoutesEnabled) {
       await exportStandaloneServerAsync(projectRoot, devServer, {
         exp,
         pkg,
@@ -332,9 +324,7 @@ export async function createMetroServerAndBundleRequestAsync(
     {
       // TODO: This is always enabled in the native script and there's no way to disable it.
       resetCache: options.resetCache,
-
       maxWorkers: options.maxWorkers,
-      config: options.config,
     },
     {
       exp,
@@ -352,22 +342,29 @@ export async function createMetroServerAndBundleRequestAsync(
     sourceMapUrl = path.basename(sourceMapUrl);
   }
 
+  const directBundleOptions = getMetroDirectBundleOptionsForExpoConfig(projectRoot, exp, {
+    splitChunks: false,
+    mainModuleName: resolveRealEntryFilePath(projectRoot, options.entryFile),
+    platform: options.platform,
+    minify: options.minify,
+    mode: options.dev ? 'development' : 'production',
+    engine: isHermes ? 'hermes' : undefined,
+    isExporting: true,
+    // Never output bytecode in the exported bundle since that is hardcoded in the native run script.
+    bytecode: false,
+    hosted: false,
+  });
+
   // TODO(cedric): check if we can use the proper `bundleType=bundle` and `entryPoint=mainModuleName` properties
-  // @ts-expect-error: see above
   const bundleRequest: BundleOptions = {
     ...Server.DEFAULT_BUNDLE_OPTIONS,
-    ...getMetroDirectBundleOptionsForExpoConfig(projectRoot, exp, {
-      splitChunks: false,
-      mainModuleName: resolveRealEntryFilePath(projectRoot, options.entryFile),
-      platform: options.platform,
-      minify: options.minify,
-      mode: options.dev ? 'development' : 'production',
-      engine: isHermes ? 'hermes' : undefined,
-      isExporting: true,
-      // Never output bytecode in the exported bundle since that is hardcoded in the native run script.
-      bytecode: false,
-      hosted: false,
-    }),
+    ...directBundleOptions,
+
+    // NOTE(@kitten): Cast non-optional defaults
+    lazy: directBundleOptions.lazy ?? Server.DEFAULT_BUNDLE_OPTIONS.lazy,
+    modulesOnly: directBundleOptions.modulesOnly ?? Server.DEFAULT_BUNDLE_OPTIONS.modulesOnly,
+    runModule: directBundleOptions.runModule ?? Server.DEFAULT_BUNDLE_OPTIONS.runModule,
+
     sourceMapUrl,
     unstable_transformProfile: (options.unstableTransformProfile ||
       (isHermes ? 'hermes-stable' : 'default')) as BundleOptions['unstable_transformProfile'],

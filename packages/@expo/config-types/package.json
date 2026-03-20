@@ -1,6 +1,6 @@
 {
   "name": "@expo/config-types",
-  "version": "54.0.8",
+  "version": "55.0.5",
   "description": "Types for the Expo config object app.config.ts",
   "types": "build/ExpoConfig.d.ts",
   "main": "build/ExpoConfig.js",
@@ -9,8 +9,7 @@
     "clean": "expo-module clean",
     "generate": "node ./scripts/generate.js",
     "lint": "expo-module lint",
-    "prepare": "expo-module clean && expo-module tsc",
-    "prepublishOnly": "expo-module prepublishOnly",
+    "prepublishOnly": "yarn run clean && yarn run build",
     "test": "expo-module test",
     "typecheck": "expo-module typecheck",
     "watch": "expo-module tsc --watch --preserveWatchOutput"
@@ -37,8 +36,8 @@
     "build"
   ],
   "devDependencies": {
-    "expo-module-scripts": "^5.0.7",
-    "json-schema-to-typescript": "^14.0.5"
+    "expo-module-scripts": "^55.0.2",
+    "json-schema-to-typescript": "^15.0.0"
   },
   "publishConfig": {
     "access": "public"

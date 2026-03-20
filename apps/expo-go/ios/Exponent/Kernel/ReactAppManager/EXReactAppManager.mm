@@ -1,6 +1,4 @@
-#import "EXBuildConstants.h"
 #import "EXEnvironment.h"
-#import "EXErrorRecoveryManager.h"
 #import "EXKernel.h"
 #import "EXAbstractLoader.h"
 #import "EXKernelLinkingManager.h"
@@ -10,7 +8,6 @@
 #import "EXReactAppManager.h"
 #import "EXReactAppManager+Private.h"
 #import "EXVersionManagerObjC.h"
-#import "EXVersions.h"
 #import "EXAppViewController.h"
 #import <ExpoModulesCore/EXModuleRegistryProvider.h>
 #import <EXConstants/EXConstantsService.h>
@@ -25,7 +22,13 @@
 #endif
 
 #import <React/RCTBridge.h>
+#import <React/RCTBridge+Private.h>
+#import <React/RCTDevSettings.h>
 #import <React/RCTRootView.h>
+
+#if __has_include(<ExpoModulesCore-Swift.h>)
+#import <ExpoModulesCore-Swift.h>
+#endif
 
 #import "Expo_Go-Swift.h"
 
@@ -167,7 +170,6 @@ NSString *const RCTInstanceDidLoadBundle = @"RCTInstanceDidLoadBundle";
     @"testEnvironment": @([EXEnvironment sharedEnvironment].testEnvironment),
     @"services": [EXKernel sharedInstance].serviceRegistry.allServices,
     @"singletonModules": [EXModuleRegistryProvider singletonModules],
-    @"moduleRegistryDelegateClass": RCTNullIfNil([self moduleRegistryDelegateClass]),
     @"fileSystemDirectories": @{
         @"documentDirectory": [self scopedDocumentDirectory],
         @"cachesDirectory": [self scopedCachesDirectory]
@@ -325,6 +327,11 @@ NSString *const RCTInstanceDidLoadBundle = @"RCTInstanceDidLoadBundle";
     _hasHostEverLoaded = YES;
     [_versionManager hostFinishedLoading:self.reactHost];
 
+    // Notify the dev menu that the manifest has changed
+    if ([self enablesDeveloperTools]) {
+      [[DevMenuManager shared] notifyManifestChanged];
+    }
+
     // TODO: temporary solution for hiding LoadingProgressWindow
     if (_appRecord.viewController) {
       EX_WEAKIFY(self);
@@ -397,7 +404,7 @@ NSString *const RCTInstanceDidLoadBundle = @"RCTInstanceDidLoadBundle";
 {
   EXManifestsManifest *manifest = _appRecord.appLoader.manifest;
   if (manifest) {
-    return manifest.isUsingDeveloperTool;
+    return manifest.isUsingDeveloperTool || manifest.isDevelopmentMode;
   }
   return false;
 }
@@ -409,11 +416,9 @@ NSString *const RCTInstanceDidLoadBundle = @"RCTInstanceDidLoadBundle";
 
 - (void)showDevMenu
 {
-  if ([self enablesDeveloperTools]) {
-    dispatch_async(dispatch_get_main_queue(), ^{
-      [self.versionManager showDevMenuForHost:self.reactHost];
-    });
-  }
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [[DevMenuManager shared] toggleMenu];
+  });
 }
 
 - (void)reloadApp
@@ -439,7 +444,7 @@ NSString *const RCTInstanceDidLoadBundle = @"RCTInstanceDidLoadBundle";
 
 - (void)toggleDevMenu
 {
-  [[EXKernel sharedInstance] switchTasks];
+  [self showDevMenu];
 }
 
 - (void)setupWebSocketControls
@@ -503,17 +508,28 @@ NSString *const RCTInstanceDidLoadBundle = @"RCTInstanceDidLoadBundle";
   });
 }
 
+- (RCTDevSettings *)_devSettings
+{
+  return (RCTDevSettings *)[[self.reactHost moduleRegistry] moduleForName:"DevSettings"];
+}
+
+- (BOOL)isHotLoadingEnabled
+{
+  return [[self _devSettings] isHotLoadingEnabled];
+}
+
+- (BOOL)isHotLoadingAvailable
+{
+  return [[self _devSettings] isHotLoadingAvailable];
+}
+
+- (BOOL)isPerfMonitorAvailable
+{
+  id perfMonitor = [[self.reactHost moduleRegistry] moduleForName:"PerfMonitor"];
+  return perfMonitor != nil && [self enablesDeveloperTools];
+}
+
 #pragma mark - RN configuration
-
-- (NSDictionary *)launchOptionsForHost
-{
-  return @{};
-}
-
-- (Class)moduleRegistryDelegateClass
-{
-  return nil;
-}
 
 - (NSString *)applicationKeyForRootView
 {

@@ -270,8 +270,10 @@ export type PagedInfo<T> = {
      */
     assets: T[];
     /**
-     * ID of the last fetched asset. It should be passed as `after` option in order to get the
-     * next page.
+     * A marker that indicates where the next page of results should start.
+     * On iOS, it is the ID of the last fetched asset.
+     * On Android, it is the index of the last fetched asset in the query results.
+     * This value should be passed as the `after` option to load the next page.
      */
     endCursor: string;
     /**
@@ -469,6 +471,9 @@ export declare function getAssetsAsync(assetsOptions?: AssetsOptions): Promise<P
  * like to unsubscribe the listener.
  */
 export declare function addListener(listener: (event: MediaLibraryAssetsChangeEvent) => void): EventSubscription;
+/**
+ * @deprecated use subscription.remove() instead.
+ */
 export declare function removeSubscription(subscription: EventSubscription): void;
 /**
  * Removes all listeners.
@@ -515,4 +520,12 @@ export declare function migrateAlbumIfNeededAsync(album: AlbumRef): Promise<void
  * @return Returns a promise which fulfils with `true` if the album should be migrated.
  */
 export declare function albumNeedsMigrationAsync(album: AlbumRef): Promise<boolean>;
+/**
+ * On iOS, this adds or removes the asset from the system "Favorites" smart album.
+ * @param asset An [Asset](#asset) or its ID.
+ * @param isFavorite Whether the asset should be marked as favorite.
+ * @platform ios
+ * @return Returns a promise which fulfils with `true` if the operation was successful.
+ */
+export declare function setAssetFavoriteAsync(asset: AssetRef, isFavorite: boolean): Promise<boolean>;
 //# sourceMappingURL=MediaLibrary.d.ts.map

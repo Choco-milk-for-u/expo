@@ -30,10 +30,10 @@
   "homepage": "<%- repo %>#readme",
   "dependencies": {},
   "devDependencies": {
-    "@types/react": "~19.1.0",
-    "expo-module-scripts": "^5.0.7",
-    "expo": "^54.0.8",
-    "react-native": "0.81.4"
+    "@types/react": "~19.1.1",
+    "expo-module-scripts": "^55.0.2",
+    "expo": "^55.0.2",
+    "react-native": "0.82.1"
   },
   "peerDependencies": {
     "expo": "*",

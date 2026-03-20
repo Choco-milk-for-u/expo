@@ -38,8 +38,10 @@ export function normalizeParams(
   const blobParams: SQLiteBindBlobParams = {};
   for (const key in bindParams) {
     const value = bindParams[key];
-    if (value instanceof Uint8Array) {
+    if (value instanceof Uint8Array || value instanceof ArrayBuffer) {
       blobParams[key] = value;
+    } else if (typeof value === 'boolean') {
+      primitiveParams[key] = value ? 1 : 0;
     } else {
       primitiveParams[key] = value;
     }
